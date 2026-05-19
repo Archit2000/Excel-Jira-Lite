@@ -1,1 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XcelDesk // Enterprise Issue Tracker</title>
+  
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src 'self' data: https://cdn.jsdelivr.net;">
 
+  <!-- Core Component CSS CDNs -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables.net-bs5@1.13.8/css/dataTables.bootstrap5.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables.net-select-bs5@1.7.0/css/select.bootstrap5.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.1/dist/sweetalert2.min.css">
+
+  <style>
+    #sidebar {
+      width: 260px;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1030;
+    }
+
+    #main-content {
+      margin-left: 260px;
+      min-height: 100vh;
+    }
+
+    #system-terminal {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar Component -->
+  <div id="sidebar" class="d-flex flex-column p-3 bg-body-tertiary border-end">
+    <div class="d-flex align-items-center mb-4 px-2">
+      <i class="bi bi-layers-half text-info fs-3 me-2"></i>
+      <span class="fs-4 fw-bold">XcelDesk<span class="text-info">.</span></span>
+    </div>
+    
+    <hr class="mt-0">
+    
+    <ul class="nav nav-pills flex-column mb-auto gap-1">
+      <li class="nav-item">
+        <a href="#" class="nav-link active" id="nav-dashboard" onclick="UI.switchTab('dashboard')">
+          <i class="bi bi-kanban me-2"></i> Issue Workspace
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link text-body-secondary" id="nav-master" onclick="UI.switchTab('master')">
+          <i class="bi bi-database-gear me-2"></i> Global Configurations
+        </a>
+      </li>
+    </ul>
+
+    <div class="mt-auto">
+      <div class="card p-2 mb-2 bg-body-secondary border">
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="small text-muted fw-bold">ENGINE STATE</span>
+          <span id="engine-status-badge" class="badge bg-danger">NO DATA</span>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="Engine.downloadTemplate()">
+        <i class="bi bi-download me-1"></i> Acquire Template
+      </button>
+    </div>
+  </div>
+
+  <!-- Primary Application Canvas -->
+  <div id="main-content" class="d-flex flex-column bg-body-main">
+    
+    <!-- Global Structural Header -->
+    <header class="navbar navbar-expand bg-body-tertiary px-4 border-bottom sticky-top py-2">
+      <div class="container-fluid px-0 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <input type="file" id="excel-file-input" class="d-none" accept=".xlsx,.xls" onchange="Engine.importFile(event)">
+          <button class="btn btn-sm btn-primary px-3 fw-semibold" onclick="document.getElementById('excel-file-input').click()">
+            <i class="bi bi-upload me-2"></i>Mount Workbook
+          </button>
+          <button class="btn btn-sm btn-success px-3 fw-semibold" id="btn-export" onclick="Engine.exportFile()" disabled>
+            <i class="bi bi-download me-2"></i>Commit & Export
+          </button>
+        </div>
+        
+        <div class="d-flex align-items-center gap-3">
+          <span class="text-muted small" id="active-file-label"><i class="bi bi-hdd me-1"></i> Memory Buffer Isolation</span>
+          <span class="badge bg-secondary" id="row-counter-badge">0 Issues Loaded</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Contextual Workspaces container -->
+    <main class="flex-grow-1 p-4">
+      
+      <!-- System Diagnostic Log Terminal Pane -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center bg-body-tertiary border border-bottom-0 px-3 py-1 rounded-top">
+          <span class="small fw-bold text-muted"><i class="bi bi-terminal me-2"></i>SYSTEM INTEGRITY DIAGNOSTIC LOGS</span>
+          <button class="btn btn-link btn-sm text-muted p-0 text-decoration-none" onclick="document.getElementById('system-terminal').innerHTML=''"><i class="bi bi-trash"></i></button>
+        </div>
+        <div id="system-terminal" class="p-3 bg-dark text-light border rounded-bottom"></div>
+      </div>
+
+      <!-- VIEW 1: MASTER WORKSPACE PANEL -->
+      <div id="tab-dashboard" class="tab-layer">
+        
+        <!-- Cross-Filter Engine Interface -->
+        <div class="card mb-4 shadow-sm">
+          <div class="card-body p-3">
+            <div class="row g-2" id="filter-matrix-row">
+              <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted">Project Domain</label>
+                <select id="filter-project" class="form-select form-select-sm" multiple></select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted">Execution Status</label>
+                <select id="filter-status" class="form-select form-select-sm" multiple></select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted">Priority Matrix</label>
+                <select id="filter-priority" class="form-select form-select-sm" multiple></select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted">Assigned Engineering Asset</label>
+                <select id="filter-assignee" class="form-select form-select-sm" multiple></select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-muted">Keyword Sub-Query Search</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
+                  <input type="text" id="global-search-input" class="form-control" placeholder="Search operational indices...">
+                  <button class="btn btn-outline-secondary" type="button" onclick="UI.clearAllFilters()"><i class="bi bi-x-circle"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Issue Aggregator & Datatable View Canvas -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2">
+            <div class="d-flex align-items-center gap-2">
+              <h5 class="mb-0 fs-6 fw-bold"><i class="bi bi-list-task me-2 text-info"></i>Active Issue Matrix</h5>
+              <div id="bulk-operation-bar" class="d-none align-items-center gap-2 ms-3 border-start ps-3">
+                <span class="small text-warning fw-bold" id="bulk-select-count">0 items selected</span>
+                <select id="bulk-status-select" class="form-select form-select-sm d-inline-block w-auto py-0" style="height:28px;">
+                  <option value="">Bulk Action: Transition Status...</option>
+                </select>
+                <button class="btn btn-sm btn-warning py-0 px-2" style="height:28px;" onclick="TicketSystem.executeBulkStatusUpdate()">Apply</button>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-info fw-bold px-3" onclick="TicketSystem.openCreateModal()" id="btn-create-ticket" disabled>
+              <i class="bi bi-plus-circle me-1"></i> Provision Ticket
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table id="issues-datatable" class="table table-hover table-striped w-100 mb-0"></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: REPOSITORIES / CONFIGURATION DIALOG SYSTEM -->
+      <div id="tab-master" class="tab-layer d-none">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2">
+                <span class="fw-bold fs-6"><i class="bi bi-folder-check me-2 text-info"></i>Projects Index Repository</span>
+                <button class="btn btn-sm btn-outline-info py-0 px-2" onclick="MasterDataSystem.addItem('projects')">+ Add</button>
+              </div>
+              <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="master-projects-list"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2">
+                <span class="fw-bold fs-6"><i class="bi bi-people me-2 text-info"></i>Human Capital / Users Engine</span>
+                <button class="btn btn-sm btn-outline-info py-0 px-2" onclick="MasterDataSystem.addItem('users')">+ Add</button>
+              </div>
+              <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="master-users-list"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2">
+                <span class="fw-bold fs-6"><i class="bi bi-toggle-on me-2 text-info"></i>Workflow States Config</span>
+                <button class="btn btn-sm btn-outline-info py-0 px-2" onclick="MasterDataSystem.addItem('status')">+ Add</button>
+              </div>
+              <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="master-status-list"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-header bg-body-tertiary d-flex justify-content-between align-items-center py-2">
+                <span class="fw-bold fs-6"><i class="bi bi-exclamation-triangle me-2 text-info"></i>Severity Priority Map</span>
+                <button class="btn btn-sm btn-outline-info py-0 px-2" onclick="MasterDataSystem.addItem('priority')">+ Add</button>
+              </div>
+              <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="master-priority-list"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- TICKET INSPECTION / MODIFICATION MODAL ARCHITECTURE -->
+  <div class="modal fade" id="ticketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-body-tertiary">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info text-dark font-monospace" id="modal-ticket-id-badge">NEW_TICKET</span>
+            <h5 class="modal-title fs-5 fw-bold" id="ticketModalLabel">Ticket Editor Engine</h5>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <form id="ticket-mutation-form" novalidate>
+            <input type="hidden" id="form-ticket-id">
+            
+            <div class="row g-3">
+              <div class="col-md-8">
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Ticket Subject Title <span class="text-danger">*</span></label>
+                  <input type="text" id="form-title" class="form-control form-control-lg" required placeholder="Provide crisp executive summary...">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Operational Scope Context / Description</label>
+                  <textarea id="form-description" class="form-control font-monospace" rows="8" placeholder="Detailed technical criteria, replication pathways..."></textarea>
+                </div>
+              </div>
+              
+              <div class="col-md-4 border-start ps-3">
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Target Project Scope <span class="text-danger">*</span></label>
+                  <select id="form-project" class="form-select" required></select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Current Workflow State <span class="text-danger">*</span></label>
+                  <select id="form-status" class="form-select" required></select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Criticality/Priority Tier <span class="text-danger">*</span></label>
+                  <select id="form-priority" class="form-select" required></select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Assigned Engineering Resource</label>
+                  <select id="form-assignee" class="form-select"></select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-bold text-muted">Target Delivery Milestone / Due Date</label>
+                  <input type="date" id="form-duedate" class="form-control">
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <hr class="my-4">
+
+          <!-- Comments Logging Chronological Layer -->
+          <div class="comments-section-wrapper">
+            <h6 class="fw-bold mb-3 text-info"><i class="bi bi-chat-square-text me-2"></i>Audit Trail & Comments Stream</h6>
+            
+            <div id="comments-stream-container" class="mb-3 d-flex flex-column gap-2 shadow-sm p-2 bg-body-tertiary rounded" style="max-height: 250px; overflow-y: auto;"></div>
+
+            <div class="bg-body-secondary p-3 rounded border">
+              <label class="form-label small fw-bold text-muted">Append Comment Frame</label>
+              <div class="input-group">
+                <textarea id="comment-input-box" class="form-control" rows="2" placeholder="Input operational notes... Type cleanly."></textarea>
+                <button class="btn btn-info fw-bold" type="button" onclick="CommentsSystem.postNewComment()">Commit Comment</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer bg-body-tertiary d-flex justify-content-between">
+          <div>
+            <button type="button" class="btn btn-outline-danger" id="btn-modal-delete" onclick="TicketSystem.executeFormDelete()"><i class="bi bi-trash me-1"></i> Purge</button>
+            <button type="button" class="btn btn-outline-warning" id="btn-modal-duplicate" onclick="TicketSystem.executeFormDuplicate()"><i class="bi bi-copy me-1"></i> Duplicate</button>
+          </div>
+          <div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abort</button>
+            <button type="button" class="btn btn-success px-4" onclick="TicketSystem.saveFormMutation()">Persist System State</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dependency JavaScript Payload Scripts Delivery -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/datatables.net@1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/datatables.net-bs5@1.13.8/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/datatables.net-select@1.7.0/js/dataTables.select.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.1/dist/sweetalert2.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.1/Sortable.min.js"></script>
+
+  <!-- platform Code Layer -->
+  <script>
+    'use strict';
+
+    const DB = {
+      MASTER_USERS: [],
+      MASTER_PROJECTS: [],
+      MASTER_STATUS: [],
+      MASTER_PRIORITY: [],
+      ISSUES: [],
+      COMMENTS: [],
+      EXTRANEOUS_SHEETS: {}, 
+      RAW_COLUMN_SCHEMAS: {} 
+    };
+
+    const STANDARD_SCHEMAS = {
+      MASTER_USERS: ['USER_NAME'],
+      MASTER_PROJECTS: ['PROJECT_NAME'],
+      MASTER_STATUS: ['STATUS_NAME'],
+      MASTER_PRIORITY: ['PRIORITY_NAME'],
+      ISSUES: ['TICKET_ID', 'TITLE', 'DESCRIPTION', 'STATUS', 'PRIORITY', 'ASSIGNED_TO', 'PROJECT', 'DUE_DATE'],
+      COMMENTS: ['COMMENT_ID', 'TICKET_ID', 'TIMESTAMP', 'TEXT']
+    };
+
+    let dataTableInstance = null;
+    let tomSelectInstances = {};
+    let modalBootstrapHandle = null;
+
+    const Logger = {
+      log(message, type = 'info') {
+        const consolePane = document.getElementById('system-terminal');
+        if (!consolePane) return;
+        const colorMap = {
+          info: '#6ea8fe',
+          success: '#75dc75',
+          warning: '#ffda6a',
+          error: '#ea868f'
+        };
+        const ts = dayjs().format('HH:mm:ss.SSS');
+        const logElement = document.createElement('div');
+        logElement.className = 'py-05 border-bottom border-secondary';
+        logElement.innerHTML = `[<span class="text-muted">${ts}</span>] [<span style="color: ${colorMap[type]}; fw-bold">${type.toUpperCase()}</span>] ${this.escapeHTML(message)}`;
+        consolePane.appendChild(logElement);
+        consolePane.scrollTop = consolePane.scrollHeight;
+      },
+      escapeHTML(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+    };
+
+    const UI = {
+      switchTab(targetTabId) {
+        document.querySelectorAll('.tab-layer').forEach(layer => layer.classList.add('d-none'));
+        document.getElementById(`tab-${targetTabId}`).classList.remove('d-none');
+        
+        document.querySelectorAll('#sidebar .nav-link').forEach(link => {
+          link.classList.remove('active');
+          link.classList.add('text-body-secondary');
+        });
+        
+        const activeLink = document.getElementById(`nav-${targetTabId}`);
+        activeLink.classList.add('active');
+        activeLink.classList.remove('text-body-secondary');
+
+        Logger.log(`Switched view environment target panel route coordinates: [${targetTabId.toUpperCase()}]`, 'info');
+      },
+
+      rebuildFilterFormControls() {
+        this.populateDropdownSelectOptions('filter-project', DB.MASTER_PROJECTS, 'PROJECT_NAME', true);
+        this.populateDropdownSelectOptions('filter-status', DB.MASTER_STATUS, 'STATUS_NAME', true);
+        this.populateDropdownSelectOptions('filter-priority', DB.MASTER_PRIORITY, 'PRIORITY_NAME', true);
+        this.populateDropdownSelectOptions('filter-assignee', DB.MASTER_USERS, 'USER_NAME', true);
+
+        this.populateDropdownSelectOptions('form-project', DB.MASTER_PROJECTS, 'PROJECT_NAME', false, 'Select Project Scope Context...');
+        this.populateDropdownSelectOptions('form-status', DB.MASTER_STATUS, 'STATUS_NAME', false, 'Select Workflow State Parameter...');
+        this.populateDropdownSelectOptions('form-priority', DB.MASTER_PRIORITY, 'PRIORITY_NAME', false, 'Select Criticality Target Tier...');
+        this.populateDropdownSelectOptions('form-assignee', DB.MASTER_USERS, 'USER_NAME', false, 'Assign Engineering Asset Reference...');
+
+        this.populateDropdownSelectOptions('bulk-status-select', DB.MASTER_STATUS, 'STATUS_NAME', false, 'Bulk Action: Transition Status...');
+      },
+
+      populateDropdownSelectOptions(domId, sourceArray, modelFieldStringKey, instantiateTomSelectFlag = false, placeholderText = '') {
+        const selectElementNode = document.getElementById(domId);
+        if(!selectElementNode) return;
+
+        if (tomSelectInstances[domId]) {
+          tomSelectInstances[domId].destroy();
+          delete tomSelectInstances[domId];
+        }
+
+        selectElementNode.innerHTML = '';
+
+        if(!instantiateTomSelectFlag && placeholderText) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.innerText = placeholderText;
+          selectElementNode.appendChild(opt);
+        }
+
+        sourceArray.forEach(item => {
+          const literalVal = item[modelFieldStringKey];
+          const opt = document.createElement('option');
+          opt.value = literalVal;
+          opt.innerText = literalVal;
+          selectElementNode.appendChild(opt);
+        });
+
+        if (instantiateTomSelectFlag) {
+          tomSelectInstances[domId] = new TomSelect(`#${domId}`, {
+            plugins: ['remove_button'],
+            create: false,
+            clearButton: true,
+            placeholder: 'All Options',
+            onChange: function() {
+              if(dataTableInstance) dataTableInstance.draw();
+            }
+          });
+        }
+      },
+
+      clearAllFilters() {
+        document.getElementById('global-search-input').value = '';
+        Object.keys(tomSelectInstances).forEach(k => tomSelectInstances[k].clear());
+        if(dataTableInstance) {
+          dataTableInstance.search('').draw();
+        }
+        Logger.log('Interface pipeline evaluation cross-filtering properties matrices cleared back to baseline.', 'info');
+      }
+    };
+
+    const MasterDataSystem = {
+      renderMasterManagementTables() {
+        this.buildSingleEntityListElement('MASTER_PROJECTS', 'PROJECT_NAME', 'master-projects-list', 'projects');
+        this.buildSingleEntityListElement('MASTER_USERS', 'USER_NAME', 'master-users-list', 'users');
+        this.buildSingleEntityListElement('MASTER_STATUS', 'STATUS_NAME', 'master-status-list', 'status');
+        this.buildSingleEntityListElement('MASTER_PRIORITY', 'PRIORITY_NAME', 'master-priority-list', 'priority');
+      },
+
+      buildSingleEntityListElement(dbKey, fieldsTarget, listDOMId, systemDesignator) {
+        const listWrapper = document.getElementById(listDOMId);
+        if(!listWrapper) return;
+        listWrapper.innerHTML = '';
+
+        if(DB[dbKey].length === 0) {
+          listWrapper.innerHTML = `<li class="list-group-item text-muted small p-3 text-center">Empty system map register trace bounds.</li>`;
+          return;
+        }
+
+        DB[dbKey].forEach((item, index) => {
+          const val = item[fieldsTarget];
+          const li = document.createElement('li');
+          li.className = "list-group-item d-flex justify-content-between align-items-center py-1 px-3 small font-monospace";
+          li.innerHTML = `
+            <span>${Logger.escapeHTML(val)}</span>
+            <div class="d-flex gap-2">
+              <button class="btn btn-link btn-xs text-info p-0 text-decoration-none" onclick="MasterDataSystem.editItem('${systemDesignator}', ${index})"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-link btn-xs text-danger p-0 text-decoration-none" onclick="MasterDataSystem.deleteItem('${systemDesignator}', ${index})"><i class="bi bi-trash"></i></button>
+            </div>
+          `;
+          listWrapper.appendChild(li);
+        });
+      },
+
+      addItem(type) {
+        const contextConfig = this.getContextConfigPackage(type);
+        Swal.fire({
+          title: `Append New Global Definition entry into: [${type.toUpperCase()}]`,
+          input: 'text',
+          inputPlaceholder: 'Enter configuration value...',
+          showCancelButton: true
+        }).then((result) => {
+          if (result.isConfirmed && result.value.trim()) {
+            const injectedStringLiteralValue = result.value.trim();
+            
+            const existingMatch = DB[contextConfig.dbKey].some(row => row[contextConfig.fieldKey].toUpperCase() === injectedStringLiteralValue.toUpperCase());
+            if (existingMatch) {
+              return Swal.fire('Duplicate Restriction Constraint Exception', 'Specified definition literal key value already occupies registry tracks.', 'error');
+            }
+
+            const appendBlockObj = {};
+            appendBlockObj[contextConfig.fieldKey] = injectedStringLiteralValue;
+            DB[contextConfig.dbKey].push(appendBlockObj);
+
+            Logger.log(`Injected configuration parameter: [${type}] -> "${injectedStringLiteralValue}"`, 'success');
+            this.syncAndCascadeDataMappingsRefreshLifecycle();
+          }
+        });
+      },
+
+      editItem(type, index) {
+        const contextConfig = this.getContextConfigPackage(type);
+        const oldLiteralStrValue = DB[contextConfig.dbKey][index][contextConfig.fieldKey];
+
+        Swal.fire({
+          title: `Mutate Structural Reference Configuration Block Definition`,
+          input: 'text',
+          inputValue: oldLiteralStrValue,
+          showCancelButton: true
+        }).then((result) => {
+          if (result.isConfirmed && result.value.trim()) {
+            const updatedLiteralStrValue = result.value.trim();
+
+            if (oldLiteralStrValue.toUpperCase() !== updatedLiteralStrValue.toUpperCase()) {
+              const duplicateValidationTrackCheck = DB[contextConfig.dbKey].some(row => row[contextConfig.fieldKey].toUpperCase() === updatedLiteralStrValue.toUpperCase());
+              if (duplicateValidationTrackCheck) {
+                return Swal.fire('State Update Disallowed', 'Target value string matches pre-existing allocated reference configurations parameters.', 'error');
+              }
+            }
+
+            MasterDataSystem.cascadeStructuralReferenceDataUpdates(type, oldLiteralStrValue, updatedLiteralStrValue);
+
+            DB[contextConfig.dbKey][index][contextConfig.fieldKey] = updatedLiteralStrValue;
+            Logger.log(`Altered system metadata definition element: [${type}] updated to: "${updatedLiteralStrValue}"`, 'warning');
+            
+            this.syncAndCascadeDataMappingsRefreshLifecycle();
+          }
+        });
+      },
+
+      deleteItem(type, index) {
+        const contextConfig = this.getContextConfigPackage(type);
+        const valueTargetLiteralStr = DB[contextConfig.dbKey][index][contextConfig.fieldKey];
+
+        let referenceCount = 0;
+        DB.ISSUES.forEach(issue => {
+          if (type === 'projects' && issue.PROJECT === valueTargetLiteralStr) referenceCount++;
+          if (type === 'users' && issue.ASSIGNED_TO === valueTargetLiteralStr) referenceCount++;
+          if (type === 'status' && issue.STATUS === valueTargetLiteralStr) referenceCount++;
+          if (type === 'priority' && issue.PRIORITY === valueTargetLiteralStr) referenceCount++;
+        });
+
+        if (referenceCount > 0) {
+          return Swal.fire('Cascading Safety Structural Block Lock', `Unable to purge configuration item. Discovered ${referenceCount} active references bound within issues registry arrays.`, 'error');
+        }
+
+        Swal.fire({
+          title: 'Confirm Configuration Purge Sequence?',
+          text: `Purging item: "${valueTargetLiteralStr}" out of operational definitions array maps.`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#ef4444'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            DB[contextConfig.dbKey].splice(index, 1);
+            Logger.log(`Successfully deleted configuration mapping dictionary option payload entry item: [${type}] -> "${valueTargetLiteralStr}"`, 'warning');
+            this.syncAndCascadeDataMappingsRefreshLifecycle();
+          }
+        });
+      },
+
+      cascadeStructuralReferenceDataUpdates(type, oldVal, newVal) {
+        let executionCounterCascadeTracker = 0;
+        DB.ISSUES.forEach(issue => {
+          if (type === 'projects' && issue.PROJECT === oldVal) { issue.PROJECT = newVal; executionCounterCascadeTracker++; }
+          if (type === 'users' && issue.ASSIGNED_TO === oldVal) { issue.ASSIGNED_TO = newVal; executionCounterCascadeTracker++; }
+          if (type === 'status' && issue.STATUS === oldVal) { issue.STATUS = newVal; executionCounterCascadeTracker++; }
+          if (type === 'priority' && issue.PRIORITY === oldVal) { issue.PRIORITY = newVal; executionCounterCascadeTracker++; }
+        });
+        if(executionCounterCascadeTracker > 0) {
+          Logger.log(`Relational cascade engine processed structural mutations dynamically updating ${executionCounterCascadeTracker} properties bindings across arrays.`, 'info');
+        }
+      },
+
+      getContextConfigPackage(type) {
+        const mappings = {
+          projects: { dbKey: 'MASTER_PROJECTS', fieldKey: 'PROJECT_NAME' },
+          users: { dbKey: 'MASTER_USERS', fieldKey: 'USER_NAME' },
+          status: { dbKey: 'MASTER_STATUS', fieldKey: 'STATUS_NAME' },
+          priority: { dbKey: 'MASTER_PRIORITY', fieldKey: 'PRIORITY_NAME' }
+        };
+        return mappings[type];
+      },
+
+      syncAndCascadeDataMappingsRefreshLifecycle() {
+        this.renderMasterManagementTables();
+        UI.rebuildFilterFormControls();
+        TicketSystem.refreshDatatablePipeline();
+      }
+    };
+
+    const Engine = {
+      importFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        Logger.log(`Target acquisition file targeted: ${file.name}. Commencing ingestion sequencing.`, 'info');
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+            
+            Engine.parseWorkbookToMemory(workbook);
+            document.getElementById('active-file-label').innerHTML = `<i class="bi bi-hdd-fill text-success"></i> ${file.name}`;
+            
+            Logger.log(`Ingestion vector complete. Mapping data indices.`, 'success');
+          } catch (err) {
+            Logger.log(`Fatal crash processing Excel structure parsing. Stack trace: ${err.message}`, 'error');
+            Swal.fire('Data Import Failure', 'Could not parse binary matrix stream correctly.', 'error');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      },
+
+      parseWorkbookToMemory(wb) {
+        Object.keys(DB).forEach(key => {
+          if(Array.isArray(DB[key])) DB[key] = [];
+          else DB[key] = {};
+        });
+
+        wb.SheetNames.forEach(sheetName => {
+          const normSheetName = sheetName.toUpperCase().trim();
+          const worksheet = wb.Sheets[sheetName];
+          const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+
+          if (STANDARD_SCHEMAS[normSheetName]) {
+            Logger.log(`Discovered mapping profile for standard layer: ${normSheetName}`, 'info');
+            
+            if(rawJson.length > 0) {
+              DB.RAW_COLUMN_SCHEMAS[normSheetName] = Object.keys(rawJson[0]);
+            } else {
+              DB.RAW_COLUMN_SCHEMAS[normSheetName] = [...STANDARD_SCHEMAS[normSheetName]];
+            }
+
+            DB[normSheetName] = rawJson.map((row, idx) => {
+              const normalizedRow = {};
+              Object.keys(row).forEach(colKey => {
+                normalizedRow[colKey.toUpperCase().trim()] = String(row[colKey]).trim();
+              });
+              
+              STANDARD_SCHEMAS[normSheetName].forEach(expectedField => {
+                if (normalizedRow[expectedField] === undefined) {
+                  normalizedRow[expectedField] = '';
+                }
+              });
+              return normalizedRow;
+            });
+          } else {
+            Logger.log(`Tracking pass-through payload array inside schema for custom sheet: ${sheetName}`, 'warning');
+            DB.EXTRANEOUS_SHEETS[sheetName] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          }
+        });
+
+        Object.keys(STANDARD_SCHEMAS).forEach(expectedKey => {
+          if (!DB[expectedKey] || DB[expectedKey].length === 0) {
+            Logger.log(`Structural auto-healing triggered for empty or missing system block: ${expectedKey}`, 'warning');
+            DB[expectedKey] = [];
+            DB.RAW_COLUMN_SCHEMAS[expectedKey] = [...STANDARD_SCHEMAS[expectedKey]];
+          }
+        });
+
+        this.deduplicateMasterDataBuckets();
+
+        document.getElementById('engine-status-badge').className = "badge bg-success";
+        document.getElementById('engine-status-badge').innerText = "MOUNTED";
+        document.getElementById('btn-export').removeAttribute('disabled');
+        document.getElementById('btn-create-ticket').removeAttribute('disabled');
+
+        UI.rebuildFilterFormControls();
+        MasterDataSystem.renderMasterManagementTables();
+        TicketSystem.refreshDatatablePipeline();
+      },
+
+      deduplicateMasterDataBuckets() {
+        ['MASTER_USERS', 'MASTER_PROJECTS', 'MASTER_STATUS', 'MASTER_PRIORITY'].forEach(key => {
+          const field = STANDARD_SCHEMAS[key][0];
+          const primarySeen = new Set();
+          DB[key] = DB[key].filter(row => {
+            const val = row[field]?.toUpperCase();
+            if(!val || primarySeen.has(val)) {
+              if(val) Logger.log(`Purged redundant data footprint from key repository ${key}: "${row[field]}"`, 'warning');
+              return false;
+            }
+            primarySeen.add(val);
+            return true;
+          });
+        });
+      },
+
+      exportFile() {
+        Logger.log('Compiling binary workbook structure state for structural output...', 'info');
+        
+        try {
+          const wb = XLSX.utils.book_new();
+
+          Object.keys(STANDARD_SCHEMAS).forEach(sheetKey => {
+            const outputRows = [];
+            const schemaHeaders = DB.RAW_COLUMN_SCHEMAS[sheetKey] || [...STANDARD_SCHEMAS[sheetKey]];
+            
+            DB[sheetKey].forEach(memRow => {
+              const exportRow = {};
+              schemaHeaders.forEach(header => {
+                const normHeader = header.toUpperCase().trim();
+                let cellValue = memRow[normHeader] || '';
+                
+                if (typeof cellValue === 'string' && (cellValue.startsWith('=') || cellValue.startsWith('+') || cellValue.startsWith('-') || cellValue.startsWith('@'))) {
+                  cellValue = `'${cellValue}`;
+                }
+                exportRow[header] = cellValue;
+              });
+              outputRows.push(exportRow);
+            });
+
+            const ws = XLSX.utils.json_to_sheet(outputRows, { header: schemaHeaders });
+            XLSX.utils.book_append_sheet(wb, ws, sheetKey);
+          });
+
+          Object.keys(DB.EXTRANEOUS_SHEETS).forEach(customSheetName => {
+            const ws = XLSX.utils.aoa_to_sheet(DB.EXTRANEOUS_SHEETS[customSheetName]);
+            XLSX.utils.book_append_sheet(wb, ws, customSheetName);
+            Logger.log(`Re-packing un-modeled pass-through sheet: ${customSheetName}`, 'info');
+          });
+
+          const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+          const blob = new Blob([this.s2ab(wbout)], { type: "application/octet-stream" });
+          
+          const trackingName = `XcelDesk_Commit_${dayjs().format('YYYYMMDD_HHmmss')}.xlsx`;
+          const downloadLink = document.createElement("a");
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = trackingName;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+
+          Logger.log(`Workbook generation output successfully saved as ${trackingName}. State synchronized.`, 'success');
+        } catch (ex) {
+          Logger.log(`Export processing failure exception flagged: ${ex.message}`, 'error');
+          Swal.fire('State Compile Failure', 'Unable to build clean workbook state structure export.', 'error');
+        }
+      },
+
+      s2ab(s) {
+        const buf = new ArrayBuffer(s.length);
+        const view = new Uint8Array(buf);
+        for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+        return buf;
+      },
+
+      downloadTemplate() {
+        const wb = XLSX.utils.book_new();
+        Object.keys(STANDARD_SCHEMAS).forEach(k => {
+          const ws = XLSX.utils.json_to_sheet([], { header: STANDARD_SCHEMAS[k] });
+          XLSX.utils.book_append_sheet(wb, ws, k);
+        });
+        
+        const wsUser = XLSX.utils.json_to_sheet([{ USER_NAME: 'Alice Dev' }, { USER_NAME: 'Bob Ops' }], { header: ['USER_NAME'] });
+        wb.Sheets['MASTER_USERS'] = wsUser;
+        const wsProj = XLSX.utils.json_to_sheet([{ PROJECT_NAME: 'Alpha Core' }, { PROJECT_NAME: 'Beta Infrastructure' }], { header: ['PROJECT_NAME'] });
+        wb.Sheets['MASTER_PROJECTS'] = wsProj;
+        const wsStat = XLSX.utils.json_to_sheet([{ STATUS_NAME: 'Todo' }, { STATUS_NAME: 'In Progress' }, { STATUS_NAME: 'Done' }], { header: ['STATUS_NAME'] });
+        wb.Sheets['MASTER_STATUS'] = wsStat;
+        const wsPrior = XLSX.utils.json_to_sheet([{ PRIORITY_NAME: 'Low' }, { PRIORITY_NAME: 'Medium' }, { PRIORITY_NAME: 'High' }], { header: ['PRIORITY_NAME'] });
+        wb.Sheets['MASTER_PRIORITY'] = wsPrior;
+
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+        const blob = new Blob([this.s2ab(wbout)], { type: "application/octet-stream" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "XcelDesk_Pristine_Architecture_Template.xlsx";
+        link.click();
+        Logger.log('Provisioned a fresh structural blueprint metadata schema template file.', 'info');
+      }
+    };
+
+    const TicketSystem = {
+      refreshDatatablePipeline() {
+        const dataSet = DB.ISSUES.map(issue => {
+          const matchedComments = DB.COMMENTS.filter(c => String(c.TICKET_ID).trim() === String(issue.TICKET_ID).trim());
+          let latestCommentStr = "-";
+          if(matchedComments.length > 0) {
+            const sorted = [...matchedComments].sort((a,b) => dayjs(b.TIMESTAMP).unix() - dayjs(a.TIMESTAMP).unix());
+            latestCommentStr = sorted[0].TEXT || "-";
+          }
+
+          return {
+            checkbox: '',
+            ticketId: issue.TICKET_ID || '',
+            title: issue.TITLE || '',
+            project: issue.PROJECT || '',
+            assignee: issue.ASSIGNED_TO || '',
+            status: issue.STATUS || '',
+            priority: issue.PRIORITY || '',
+            duedate: issue.DUE_DATE || '',
+            latestComment: latestCommentStr,
+            actions: ''
+          };
+        });
+
+        document.getElementById('row-counter-badge').innerText = `${dataSet.length} Issues Loaded`;
+
+        if (dataTableInstance) {
+          dataTableInstance.clear().rows.add(dataSet).draw();
+          return;
+        }
+
+        dataTableInstance = $('#issues-datatable').DataTable({
+          data: dataSet,
+          pageLength: 25,
+          ordering: true,
+          autoWidth: false,
+          order: [[1, 'desc']],
+          select: {
+            style: 'multi',
+            selector: 'td:first-child input'
+          },
+          columns: [
+            {
+              data: null,
+              title: '<input type="checkbox" class="form-check-input" id="bulk-select-master-box" onclick="TicketSystem.toggleBulkSelectMaster(this)">',
+              orderable: false,
+              searchable: false,
+              width: '2%',
+              render: function () {
+                return '<input type="checkbox" class="form-check-input row-select-item-checkbox" onclick="TicketSystem.evaluateBulkActionBarVisibility()">';
+              }
+            },
+            { data: 'ticketId', title: 'ID', width: '8%', className: 'font-monospace text-info fw-bold' },
+            { 
+              data: 'title', 
+              title: 'Summary Description', 
+              width: '25%',
+              render: function(data) { return `<span class="fw-semibold">${Logger.escapeHTML(data)}</span>`; }
+            },
+            { data: 'project', title: 'Project Scope', width: '10%' },
+            { data: 'assignee', title: 'Engineering Asset', width: '12%' },
+            { 
+              data: 'status', 
+              title: 'State', 
+              width: '10%',
+              render: function(data) {
+                let badgeClass = "bg-secondary";
+                const clean = String(data).toLowerCase().replace(/\s+/g, '');
+                if (clean === 'todo') badgeClass = 'bg-dark-subtle text-body-emphasis border border-secondary';
+                else if (clean === 'inprogress') badgeClass = 'bg-primary text-light';
+                else if (clean === 'done') badgeClass = 'bg-success text-light';
+                return `<span class="badge ${badgeClass} text-uppercase px-2 py-1">${Logger.escapeHTML(data)}</span>`;
+              }
+            },
+            { 
+              data: 'priority', 
+              title: 'Priority Matrix', 
+              width: '8%',
+              render: function(data) {
+                let pColor = "text-muted";
+                const clean = String(data).toLowerCase();
+                if(clean === 'high' || clean === 'critical') pColor = 'text-danger';
+                else if(clean === 'medium') pColor = 'text-warning';
+                else if(clean === 'low') pColor = 'text-success';
+                return `<span class="fw-bold ${pColor}"><i class="bi bi-circle-fill me-1" style="font-size:0.6rem;"></i>${Logger.escapeHTML(data)}</span>`;
+              }
+            },
+            { 
+              data: 'duedate', 
+              title: 'Timeline Limit', 
+              width: '10%',
+              render: function(data) { return data ? dayjs(data).format('YYYY-MM-DD') : '<span class="text-muted">-</span>'; }
+            },
+            { 
+              data: 'latestComment', 
+              title: 'Latest Comment Stream Update', 
+              width: '15%', 
+              className: 'text-truncate text-muted',
+              render: function(data) { return `<small>${Logger.escapeHTML(data)}</small>`; }
+            },
+            {
+              data: null,
+              title: 'Control Matrix',
+              orderable: false,
+              searchable: false,
+              width: '5%',
+              className: 'text-end',
+              render: function (data, type, row) {
+                return `<button class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.75rem;" onclick="TicketSystem.openEditModal('${row.ticketId}')"><i class="bi bi-pencil-square"></i></button>`;
+              }
+            }
+          ],
+          dom: '<"d-none"f>rtip', 
+          language: {
+            paginate: { previous: '<i class="bi bi-chevron-left"></i>', next: '<i class="bi bi-chevron-right"></i>' }
+          }
+        });
+
+        $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+          return TicketSystem.evaluateRowCriteriaMatch(data, dataIndex);
+        });
+      },
+
+      evaluateRowCriteriaMatch(data, index) {
+        const pSel = tomSelectInstances['filter-project']?.getValue() || [];
+        const sSel = tomSelectInstances['filter-status']?.getValue() || [];
+        const prSel = tomSelectInstances['filter-priority']?.getValue() || [];
+        const aSel = tomSelectInstances['filter-assignee']?.getValue() || [];
+
+        const issue = DB.ISSUES[index];
+        if(!issue) return false;
+
+        if (pSel.length > 0 && !pSel.includes(issue.PROJECT)) return false;
+        if (sSel.length > 0 && !sSel.includes(issue.STATUS)) return false;
+        if (prSel.length > 0 && !prSel.includes(issue.PRIORITY)) return false;
+        if (aSel.length > 0 && !aSel.includes(issue.ASSIGNED_TO)) return false;
+
+        return true;
+      },
+
+      triggerSystemSearchRouting() {
+        const searchInputStr = document.getElementById('global-search-input').value;
+        if(dataTableInstance) {
+          dataTableInstance.search(searchInputStr).draw();
+        }
+      },
+
+      toggleBulkSelectMaster(masterCheckbox) {
+        const state = masterCheckbox.checked;
+        $('.row-select-item-checkbox').each(function() {
+          this.checked = state;
+          const tr = $(this).closest('tr');
+          if(state) {
+            dataTableInstance.row(tr).select();
+          } else {
+            dataTableInstance.row(tr).deselect();
+          }
+        });
+        this.evaluateBulkActionBarVisibility();
+      },
+
+      evaluateBulkActionBarVisibility() {
+        const checkedCount = $('.row-select-item-checkbox:checked').length;
+        const bar = document.getElementById('bulk-operation-bar');
+        if(checkedCount > 0) {
+          bar.classList.remove('d-none');
+          bar.classList.add('d-flex');
+          document.getElementById('bulk-select-count').innerText = `${checkedCount} elements targeted`;
+        } else {
+          bar.classList.remove('d-flex');
+          bar.classList.add('d-none');
+          const mBox = document.getElementById('bulk-select-master-box');
+          if(mBox) mBox.checked = false;
+        }
+      },
+
+      executeBulkStatusUpdate() {
+        const targetStatus = document.getElementById('bulk-status-select').value;
+        if(!targetStatus) {
+          return Swal.fire('Operational Choice Required', 'Select transition state matrix first.', 'warning');
+        }
+
+        const targetedIndices = [];
+        $('.row-select-item-checkbox:checked').each(function() {
+          const rowData = dataTableInstance.row($(this).closest('tr')).data();
+          if(rowData && rowData.ticketId) {
+            targetedIndices.push(rowData.ticketId);
+          }
+        });
+
+        DB.ISSUES.forEach(issue => {
+          if(targetedIndices.includes(issue.TICKET_ID)) {
+            issue.STATUS = targetStatus;
+          }
+        });
+
+        Logger.log(`Bulk structural update processed. Modified ${targetedIndices.length} items to status: [${targetStatus}]`, 'success');
+        this.refreshDatatablePipeline();
+        this.evaluateBulkActionBarVisibility();
+        Swal.fire('State Modification Active', 'The targeted rows structural transition maps were altered successfully.', 'success');
+      },
+
+      openCreateModal() {
+        this.resetFormStateLayout();
+        document.getElementById('modal-ticket-id-badge').innerText = "NEW_PROVISION";
+        document.getElementById('btn-modal-delete').style.display = 'none';
+        document.getElementById('btn-modal-duplicate').style.display = 'none';
+        
+        document.getElementById('comments-stream-container').innerHTML = `<p class="text-muted small p-2 mb-0">Comments available following model allocation trace.</p>`;
+        
+        if (!modalBootstrapHandle) {
+          modalBootstrapHandle = new bootstrap.Modal(document.getElementById('ticketModal'));
+        }
+        modalBootstrapHandle.show();
+      },
+
+      openEditModal(id) {
+        this.resetFormStateLayout();
+        const issue = DB.ISSUES.find(i => String(i.TICKET_ID) === String(id));
+        if(!issue) return Logger.log(`Unable to isolate element pointers for ticket lookup key ID: ${id}`, 'error');
+
+        document.getElementById('modal-ticket-id-badge').innerText = issue.TICKET_ID;
+        document.getElementById('form-ticket-id').value = issue.TICKET_ID;
+        document.getElementById('form-title').value = issue.TITLE || '';
+        document.getElementById('form-description').value = issue.DESCRIPTION || '';
+        document.getElementById('form-project').value = issue.PROJECT || '';
+        document.getElementById('form-status').value = issue.STATUS || '';
+        document.getElementById('form-priority').value = issue.PRIORITY || '';
+        document.getElementById('form-assignee').value = issue.ASSIGNED_TO || '';
+        document.getElementById('form-duedate').value = issue.DUE_DATE || '';
+
+        document.getElementById('btn-modal-delete').style.display = 'inline-block';
+        document.getElementById('btn-modal-duplicate').style.display = 'inline-block';
+
+        CommentsSystem.renderTicketCommentsStream(issue.TICKET_ID);
+
+        if (!modalBootstrapHandle) {
+          modalBootstrapHandle = new bootstrap.Modal(document.getElementById('ticketModal'));
+        }
+        modalBootstrapHandle.show();
+      },
+
+      resetFormStateLayout() {
+        document.getElementById('ticket-mutation-form').reset();
+        document.getElementById('ticket-mutation-form').classList.remove('was-validated');
+        document.getElementById('form-ticket-id').value = '';
+        document.getElementById('comment-input-box').value = '';
+      },
+
+      saveFormMutation() {
+        const form = document.getElementById('ticket-mutation-form');
+        if (!form.checkValidity()) {
+          form.classList.add('was-validated');
+          return Swal.fire('Validation Constraint Truncation', 'Rectify validation errors before submitting operational state parameters.', 'error');
+        }
+
+        const tId = document.getElementById('form-ticket-id').value;
+        const payloadData = {
+          TITLE: document.getElementById('form-title').value.trim(),
+          DESCRIPTION: document.getElementById('form-description').value.trim(),
+          PROJECT: document.getElementById('form-project').value,
+          STATUS: document.getElementById('form-status').value,
+          PRIORITY: document.getElementById('form-priority').value,
+          ASSIGNED_TO: document.getElementById('form-assignee').value,
+          DUE_DATE: document.getElementById('form-duedate').value
+        };
+
+        if (tId) {
+          const index = DB.ISSUES.findIndex(i => String(i.TICKET_ID) === String(tId));
+          if(index !== -1) {
+            DB.ISSUES[index] = { ...DB.ISSUES[index], ...payloadData };
+            Logger.log(`System State Update Committed: Core ID ${tId}`, 'success');
+          }
+        } else {
+          const generatedId = this.generateUniqueTicketHex();
+          const newIssue = {
+            TICKET_ID: generatedId,
+            ...payloadData
+          };
+          DB.ISSUES.push(newIssue);
+          Logger.log(`Pristine Task Context Track Created: Assigned unique key identifier ${generatedId}`, 'success');
+        }
+
+        this.refreshDatatablePipeline();
+        if (modalBootstrapHandle) {
+          modalBootstrapHandle.hide();
+        }
+      },
+
+      generateUniqueTicketHex() {
+        let maxIntNum = 1000;
+        DB.ISSUES.forEach(issue => {
+          const numericalPart = parseInt(String(issue.TICKET_ID).replace(/[^0-9]/g, ''));
+          if (!isNaN(numericalPart) && numericalPart > maxIntNum) {
+            maxIntNum = numericalPart;
+          }
+        });
+        return `TK-${maxIntNum + 1}`;
+      },
+
+      executeFormDelete() {
+        const tId = document.getElementById('form-ticket-id').value;
+        if (!tId) return;
+
+        Swal.fire({
+          title: 'Confirm Purge Command Sequences?',
+          text: `Target allocation reference ${tId} will be permanently dropped out of runtime cache arrays.`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#ef4444',
+          confirmButtonText: 'Confirm Total Purge Operation'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            DB.ISSUES = DB.ISSUES.filter(i => String(i.TICKET_ID) !== String(tId));
+            DB.COMMENTS = DB.COMMENTS.filter(c => String(c.TICKET_ID) !== String(tId));
+            
+            Logger.log(`Purged operational data block entity reference tracking structure mappings for: ${tId}`, 'warning');
+            TicketSystem.refreshDatatablePipeline();
+            if (modalBootstrapHandle) {
+              modalBootstrapHandle.hide();
+            }
+          }
+        });
+      },
+
+      executeFormDuplicate() {
+        const tId = document.getElementById('form-ticket-id').value;
+        if (!tId) return;
+
+        const generatedId = this.generateUniqueTicketHex();
+        const copyPayload = {
+          TICKET_ID: generatedId,
+          TITLE: `${document.getElementById('form-title').value.trim()} (Copy Sequence)`,
+          DESCRIPTION: document.getElementById('form-description').value.trim(),
+          PROJECT: document.getElementById('form-project').value,
+          STATUS: document.getElementById('form-status').value,
+          PRIORITY: document.getElementById('form-priority').value,
+          ASSIGNED_TO: document.getElementById('form-assignee').value,
+          DUE_DATE: document.getElementById('form-duedate').value
+        };
+
+        DB.ISSUES.push(copyPayload);
+        Logger.log(`Duplication execution loop complete. Generated clone trace node target ${generatedId} from template ${tId}`, 'success');
+        this.refreshDatatablePipeline();
+        if (modalBootstrapHandle) {
+          modalBootstrapHandle.hide();
+        }
+        Swal.fire('Duplicate Node Generated', `Provisioned copy clone key identifier ${generatedId}`, 'success');
+      }
+    };
+
+    const CommentsSystem = {
+      renderTicketCommentsStream(ticketId) {
+        const container = document.getElementById('comments-stream-container');
+        container.innerHTML = '';
+
+        const targetSubset = DB.COMMENTS.filter(c => String(c.TICKET_ID).trim() === String(ticketId).trim());
+        const structuredChronologicalList = [...targetSubset].sort((a,b) => dayjs(a.TIMESTAMP).unix() - dayjs(b.TIMESTAMP).unix());
+
+        if(structuredChronologicalList.length === 0) {
+          container.innerHTML = `<div class="text-muted small p-3 text-center">No structural entry log audit notes compiled against this tracking segment context index.</div>`;
+          return;
+        }
+
+        structuredChronologicalList.forEach(comment => {
+          const boxFrame = document.createElement('div');
+          boxFrame.className = "p-2 mb-1 border border-secondary bg-body-secondary rounded d-flex flex-column gap-1 position-relative";
+          boxFrame.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-1 mb-1 border-secondary-subtle">
+              <span class="text-info small font-monospace"><i class="bi bi-clock me-1"></i>${dayjs(comment.TIMESTAMP).format('YYYY-MM-DD HH:mm:ss')}</span>
+              <div class="d-flex gap-2">
+                <button class="btn btn-link btn-xs text-muted p-0 text-decoration-none" style="font-size:0.7rem;" onclick="CommentsSystem.editCommentNodeInline('${comment.COMMENT_ID}')">Edit</button>
+                <button class="btn btn-link btn-xs text-danger p-0 text-decoration-none" style="font-size:0.7rem;" onclick="CommentsSystem.dropCommentNode('${comment.COMMENT_ID}')">Drop</button>
+              </div>
+            </div>
+            <div class="font-monospace small white-space-pre-wrap">${Logger.escapeHTML(comment.TEXT)}</div>
+          `;
+          container.appendChild(boxFrame);
+        });
+        container.scrollTop = container.scrollHeight;
+      },
+
+      postNewComment() {
+        const tId = document.getElementById('form-ticket-id').value;
+        if(!tId) return Swal.fire('Storage Key Assignment Context Empty', 'A tracking entity allocation reference boundary key is missing context.', 'warning');
+
+        const textInput = document.getElementById('comment-input-box').value.trim();
+        if(!textInput) return;
+
+        const generatedCommentId = `CM-${dayjs().unix()}-${Math.floor(Math.random() * 1000)}`;
+        const newRecord = {
+          COMMENT_ID: generatedCommentId,
+          TICKET_ID: tId,
+          TIMESTAMP: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+          TEXT: textInput
+        };
+
+        DB.COMMENTS.push(newRecord);
+        document.getElementById('comment-input-box').value = '';
+        
+        Logger.log(`Committed audit text reference frame entry tracking index node identifier: ${generatedCommentId}`, 'success');
+        this.renderTicketCommentsStream(tId);
+        TicketSystem.refreshDatatablePipeline(); 
+      },
+
+      editCommentNodeInline(cId) {
+        const index = DB.COMMENTS.findIndex(c => String(c.COMMENT_ID) === String(cId));
+        if(index === -1) return;
+
+        Swal.fire({
+          title: 'Update Dynamic Comment Stream Payload Element',
+          input: 'textarea',
+          inputValue: DB.COMMENTS[index].TEXT,
+          showCancelButton: true,
+          confirmButtonText: 'Persist Updates'
+        }).then((result) => {
+          if (result.isConfirmed && result.value.trim()) {
+            DB.COMMENTS[index].TEXT = result.value.trim();
+            Logger.log(`Updated analytical content strings within audit block record target pointer identity: ${cId}`, 'info');
+            this.renderTicketCommentsStream(DB.COMMENTS[index].TICKET_ID);
+            TicketSystem.refreshDatatablePipeline();
+          }
+        });
+      },
+
+      dropCommentNode(cId) {
+        const matchRecord = DB.COMMENTS.find(c => String(c.COMMENT_ID) === String(cId));
+        if(!matchRecord) return;
+
+        DB.COMMENTS = DB.COMMENTS.filter(c => String(c.COMMENT_ID) !== String(cId));
+        Logger.log(`Dropped structural log tracking entity metadata key: ${cId}`, 'warning');
+        this.renderTicketCommentsStream(matchRecord.TICKET_ID);
+        TicketSystem.refreshDatatablePipeline();
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      Logger.log('System core operational runtime initialization routine completed. Framework components functional.', 'info');
+      
+      document.getElementById('global-search-input').addEventListener('input', () => {
+        TicketSystem.triggerSystemSearchRouting();
+      });
+
+      Engine.parseWorkbookToMemory(XLSX.utils.book_new());
+    });
+  </script>
+</body>
+</html>
